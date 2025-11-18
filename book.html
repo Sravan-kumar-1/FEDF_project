@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Book Your Service | Daddy’s Garage</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    body { font-family: "Poppins", sans-serif; background-color:#f4f6f8; margin:0; padding:0; }
+    .wrap { max-width:600px; margin:60px auto; background:#fff; border-radius:16px; box-shadow:0 10px 25px rgba(0,0,0,0.1); padding:30px 40px; }
+    h2 { text-align:center; color:#0f6fb2; margin-bottom:20px; }
+    label{ font-weight:600; margin-top:12px; display:block; }
+    input, select { width:100%; padding:10px; border-radius:8px; border:1px solid #ccc; margin-top:6px; font-size:15px; }
+    button{ width:100%; background:#0f6fb2; color:#fff; border:none; padding:12px; border-radius:8px; margin-top:20px; font-size:16px; cursor:pointer; }
+    button:hover{ background:#198fe0; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h2>Book Your Service</h2>
+
+    <form id="bookForm">
+
+      <label>Service ID</label>
+      <!-- FIX ✅ Removed name="service_id" here -->
+      <input type="text" id="serviceId" placeholder="Auto-filled" readonly required>
+
+      <label>Your Name</label>
+      <input type="text" name="name" required>
+
+      <label>Contact Number</label>
+      <input type="tel" name="phone" required>
+
+      <label>Select Service</label>
+      <!-- ✅ This is the only service_id field sent to backend -->
+      <select name="service_id" id="serviceSelect" required>
+        <option value="">-- Choose a Service --</option>
+        <optgroup label="Periodic Services">
+          <option value="101">Periodic Car Service</option>
+          <option value="102">Basic Service</option>
+          <option value="103">Standard Service</option>
+          <option value="104">Comprehensive Service</option>
+        </optgroup>
+        <optgroup label="Repairs">
+          <option value="201">Engine Repair</option>
+          <option value="202">Clutch & Body Parts Repair</option>
+          <option value="203">Suspension Work</option>
+          <option value="204">Steering Repair</option>
+          <option value="205">Transmission / Gearbox Repair</option>
+          <option value="206">Brake Repair</option>
+        </optgroup>
+        <optgroup label="AC Services">
+          <option value="301">AC Service</option>
+          <option value="302">AC Gas Refill</option>
+          <option value="303">AC Filter Cleaning</option>
+          <option value="304">Cooling Coil Replacement</option>
+        </optgroup>
+        <optgroup label="Paint & Detailing">
+          <option value="401">Full Body Paint</option>
+          <option value="402">Panel Painting</option>
+          <option value="403">Bumper Paint</option>
+          <option value="404">Alloy Wheel Paint</option>
+          <option value="405">Car Wash</option>
+          <option value="406">Interior Vacuum Cleaning</option>
+          <option value="407">Exterior Rubbing & Polishing</option>
+          <option value="408">Interior Deep Cleaning</option>
+          <option value="409">Complete Detailing</option>
+        </optgroup>
+      </select>
+
+      <label>Select Car Model</label>
+      <select name="car_model" required>
+        <option value="">-- Choose Car Model --</option>
+        <option>Maruti Suzuki Swift</option>
+        <option>Hyundai i20</option>
+        <option>Tata Nexon</option>
+        <option>Mahindra XUV300</option>
+        <option>Honda City</option>
+        <option>Toyota Innova Crysta</option>
+        <option>Kia Seltos</option>
+        <option>Skoda Rapid</option>
+      </select>
+      <input type="hidden" name="latitude" id="latitude">
+      <input type="hidden" name="longitude" id="longitude">
+
+      <label>Your Location</label>
+<button type="button" id="locateBtn" style="margin-bottom: 10px;">📍 Get Current Location</button>
+
+<div id="map" style="height: 250px; border-radius: 10px; margin-bottom: 15px;"></div>
+
+      <button type="submit">Confirm Booking</button>
+    </form>
+  </div>
+
+<script>
+// ✅ Auto-fill Service ID when service changes
+const serviceSelect = document.getElementById("serviceSelect");
+const serviceIdField = document.getElementById("serviceId");
+
+serviceSelect.addEventListener("change", function () {
+  serviceIdField.value = this.value || "";
+});
+
+// ✅ Single clean submit handler (no double popups)
+document.getElementById("bookForm").addEventListener("submit", async function(e){
+  e.preventDefault();
+  
+  const formData = new FormData(this);
+  formData.set("service_name", serviceSelect.options[serviceSelect.selectedIndex].text);
+
+  try {
+    const res = await fetch("backend/book_service.php", { method:"POST", body: formData });
+    const json = await res.json();
+    
+    if(json.status === "success"){
+      alert("✅ Booking Successful!");
+      this.reset();
+      serviceIdField.value = "";
+    } else {
+      alert("⚠️ Booking Failed: " + (json.message || "Try again"));
+    }
+
+  } catch (err) {
+    alert("❌ Server Error! Check internet / backend");
+    console.log(err);
+  }
+});
+// 🌍 Initialize Map
+let map = L.map('map').setView([20.5937, 78.9629], 5); // India default view
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+let marker;
+
+// 📍 Get Current Location
+document.getElementById("locateBtn").addEventListener("click", () => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(position => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      // Fill hidden inputs
+      document.getElementById("latitude").value = lat;
+      document.getElementById("longitude").value = lng;
+
+      // Update map marker
+      if (marker) map.removeLayer(marker);
+      marker = L.marker([lat, lng]).addTo(map)
+        .bindPopup("Your Location")
+        .openPopup();
+
+      map.setView([lat, lng], 15);
+
+    }, () => {
+      alert("Failed to retrieve location!");
+    });
+  } else {
+    alert("Geolocation not supported!");
+  }
+});
+
+</script>
+
+</body>
+</html>
